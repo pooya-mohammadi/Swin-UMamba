@@ -1,3 +1,5 @@
+from typing import Union
+import re
 import os
 from os.path import join
 
@@ -32,16 +34,53 @@ class nnUNetTrainerSwinUMambaDScratch(nnUNetTrainer):
                                    dataset_json,
                                    configuration_manager: ConfigurationManager,
                                    num_input_channels,
-                                   enable_deep_supervision: bool = True) -> nn.Module:
+                                   # pretrain_path: str,
+                                   enable_deep_supervision: bool = True,
+                                   ) -> nn.Module:
 
         model = get_swin_umamba_d_from_plans(
             plans_manager, dataset_json, configuration_manager,
-            num_input_channels, deep_supervision=enable_deep_supervision,
-            use_pretrain=False)  # disable pretrain checkpoint
+            num_input_channels,
+            deep_supervision=enable_deep_supervision,
+            use_pretrain=False,
+            # pretrain_path=pretrain_path
+
+        )  # disable pretrain checkpoint
         summary(model, input_size=[1, num_input_channels] + configuration_manager.patch_size)
 
         return model
-    
+
+    def load_checkpoint(self, filename_or_checkpoint: Union[dict, str]) -> None:
+        if "vmamba" in filename_or_checkpoint:
+            model:nn.Module = self.network
+            num_input_channels = next(model.parameters()).shape[1]
+            print(f"Loading weights from: {filename_or_checkpoint} with num_input_channels: {num_input_channels}")
+            skip_params = ["norm.weight", "norm.bias", "head.weight", "head.bias"]
+
+            ckpt = torch.load(filename_or_checkpoint, map_location='cpu')
+            model_dict = model.state_dict()
+            for k, v in ckpt['model'].items():
+                if k in skip_params:
+                    print(f"Skipping weights: {k}")
+                    continue
+                kr = f"vssm_encoder.{k}"
+                if "patch_embed" in k and ckpt['model']["patch_embed.proj.weight"].shape[1] != num_input_channels:
+                    print(f"Passing weights: {k}")
+                    continue
+                if "downsample" in kr:
+                    i_ds = int(re.findall(r"layers\.(\d+)\.downsample", kr)[0])
+                    kr = kr.replace(f"layers.{i_ds}.downsample", f"downsamples.{i_ds}")
+                    assert kr in model_dict.keys()
+                if kr in model_dict.keys():
+                    assert v.shape == model_dict[kr].shape, f"Shape mismatch: {v.shape} vs {model_dict[kr].shape}"
+                    model_dict[kr] = v
+                else:
+                    print(f"Passing weights: {k}")
+
+            model.load_state_dict(model_dict)
+        else:
+            super().load_checkpoint(filename_or_checkpoint)
+
     def configure_optimizers(self):
 
         optimizer = AdamW(

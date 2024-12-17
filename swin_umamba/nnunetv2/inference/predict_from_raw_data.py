@@ -2,7 +2,6 @@ import inspect
 import itertools
 import multiprocessing
 import os
-import traceback
 from copy import deepcopy
 from time import sleep
 from typing import Tuple, Union, List, Optional
@@ -50,7 +49,7 @@ class nnUNetPredictor(object):
         self.allow_tqdm = allow_tqdm
 
         self.plans_manager, self.configuration_manager, self.list_of_parameters, self.network, self.dataset_json, \
-        self.trainer_name, self.allowed_mirroring_axes, self.label_manager = None, None, None, None, None, None, None, None
+            self.trainer_name, self.allowed_mirroring_axes, self.label_manager = None, None, None, None, None, None, None, None
 
         self.tile_step_size = tile_step_size
         self.use_gaussian = use_gaussian
@@ -67,7 +66,8 @@ class nnUNetPredictor(object):
 
     def initialize_from_trained_model_folder(self, model_training_output_dir: str,
                                              use_folds: Union[Tuple[Union[int, str]], None],
-                                             checkpoint_name: str = 'checkpoint_final.pth'):
+                                             checkpoint_name: str = 'checkpoint_final.pth',
+                                             pretrain_path: str = ""):
         """
         This is used when making predictions with a trained model
         """
@@ -84,7 +84,9 @@ class nnUNetPredictor(object):
         parameters = []
         for i, f in enumerate(use_folds):
             f = int(f) if f != 'all' else f
-            checkpoint = torch.load(join(model_training_output_dir, f'fold_{f}', checkpoint_name),
+            checkpoint = torch.load(join(model_training_output_dir,
+                                         f'fold_{f}',
+                                         checkpoint_name),
                                     map_location=torch.device('cpu'))
             if i == 0:
                 trainer_name = checkpoint['trainer_name']
@@ -130,7 +132,8 @@ class nnUNetPredictor(object):
         self.allowed_mirroring_axes = inference_allowed_mirroring_axes
         self.label_manager = plans_manager.get_label_manager(dataset_json)
         allow_compile = True
-        allow_compile = allow_compile and ('nnUNet_compile' in os.environ.keys()) and (os.environ['nnUNet_compile'].lower() in ('true', '1', 't'))
+        allow_compile = allow_compile and ('nnUNet_compile' in os.environ.keys()) and (
+                    os.environ['nnUNet_compile'].lower() in ('true', '1', 't'))
         allow_compile = allow_compile and not isinstance(self.network, OptimizedModule)
         if isinstance(self.network, DistributedDataParallel):
             allow_compile = allow_compile and isinstance(self.network.module, OptimizedModule)
@@ -275,9 +278,9 @@ class nnUNetPredictor(object):
     def get_data_iterator_from_raw_npy_data(self,
                                             image_or_list_of_images: Union[np.ndarray, List[np.ndarray]],
                                             segs_from_prev_stage_or_list_of_segs_from_prev_stage: Union[None,
-                                                                                                        np.ndarray,
-                                                                                                        List[
-                                                                                                            np.ndarray]],
+                                            np.ndarray,
+                                            List[
+                                                np.ndarray]],
                                             properties_or_list_of_properties: Union[dict, List[dict]],
                                             truncated_ofname: Union[str, List[str], None],
                                             num_processes: int = 3):
@@ -314,9 +317,9 @@ class nnUNetPredictor(object):
     def predict_from_list_of_npy_arrays(self,
                                         image_or_list_of_images: Union[np.ndarray, List[np.ndarray]],
                                         segs_from_prev_stage_or_list_of_segs_from_prev_stage: Union[None,
-                                                                                                    np.ndarray,
-                                                                                                    List[
-                                                                                                        np.ndarray]],
+                                        np.ndarray,
+                                        List[
+                                            np.ndarray]],
                                         properties_or_list_of_properties: Union[dict, List[dict]],
                                         truncated_ofname: Union[str, List[str], None],
                                         num_processes: int = 3,
@@ -610,13 +613,16 @@ class nnUNetPredictor(object):
                 if self.perform_everything_on_device and self.device != 'cpu':
                     # we need to try except here because we can run OOM in which case we need to fall back to CPU as a results device
                     try:
-                        predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers, self.perform_everything_on_device)
+                        predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
+                                                                                               self.perform_everything_on_device)
                     except RuntimeError:
-                        print('Prediction on device was unsuccessful, probably due to a lack of memory. Moving results arrays to CPU')
+                        print(
+                            'Prediction on device was unsuccessful, probably due to a lack of memory. Moving results arrays to CPU')
                         empty_cache(self.device)
                         predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers, False)
                 else:
-                    predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers, self.perform_everything_on_device)
+                    predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
+                                                                                           self.perform_everything_on_device)
 
                 empty_cache(self.device)
                 # revert padding
@@ -672,7 +678,6 @@ def predict_entry_point_modelfolder():
     parser.add_argument('--disable_progress_bar', action='store_true', required=False, default=False,
                         help='Set this flag to disable progress bar. Recommended for HPC environments (non interactive '
                              'jobs)')
-
 
     print(
         "\n#######################################################################\nPlease cite the following paper "
@@ -854,58 +859,56 @@ def predict_entry_point():
     #                           part_id=args.part_id,
     #                           device=device)
 
+# if __name__ == '__main__':
+#     # predict a bunch of files
+#     from nnunetv2.paths import nnUNet_results, nnUNet_raw
+#     predictor = nnUNetPredictor(
+#         tile_step_size=0.5,
+#         use_gaussian=True,
+#         use_mirroring=True,
+#         perform_everything_on_device=True,
+#         device=torch.device('cuda', 0),
+#         verbose=False,
+#         verbose_preprocessing=False,
+#         allow_tqdm=True
+#         )
+#     predictor.initialize_from_trained_model_folder(
+#         join(nnUNet_results, 'Dataset003_Liver/nnUNetTrainer__nnUNetPlans__3d_lowres'),
+#         use_folds=(0, ),
+#         checkpoint_name='checkpoint_final.pth',
+#     )
+#     predictor.predict_from_files(join(nnUNet_raw, 'Dataset003_Liver/imagesTs'),
+#                                  join(nnUNet_raw, 'Dataset003_Liver/imagesTs_predlowres'),
+#                                  save_probabilities=False, overwrite=False,
+#                                  num_processes_preprocessing=2, num_processes_segmentation_export=2,
+#                                  folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
+#
+#     # predict a numpy array
+#     from nnunetv2.imageio.simpleitk_reader_writer import SimpleITKIO
+#     img, props = SimpleITKIO().read_images([join(nnUNet_raw, 'Dataset003_Liver/imagesTr/liver_63_0000.nii.gz')])
+#     ret = predictor.predict_single_npy_array(img, props, None, None, False)
+#
+#     iterator = predictor.get_data_iterator_from_raw_npy_data([img], None, [props], None, 1)
+#     ret = predictor.predict_from_data_iterator(iterator, False, 1)
 
-if __name__ == '__main__':
-    # predict a bunch of files
-    from nnunetv2.paths import nnUNet_results, nnUNet_raw
-    predictor = nnUNetPredictor(
-        tile_step_size=0.5,
-        use_gaussian=True,
-        use_mirroring=True,
-        perform_everything_on_device=True,
-        device=torch.device('cuda', 0),
-        verbose=False,
-        verbose_preprocessing=False,
-        allow_tqdm=True
-        )
-    predictor.initialize_from_trained_model_folder(
-        join(nnUNet_results, 'Dataset003_Liver/nnUNetTrainer__nnUNetPlans__3d_lowres'),
-        use_folds=(0, ),
-        checkpoint_name='checkpoint_final.pth',
-    )
-    predictor.predict_from_files(join(nnUNet_raw, 'Dataset003_Liver/imagesTs'),
-                                 join(nnUNet_raw, 'Dataset003_Liver/imagesTs_predlowres'),
-                                 save_probabilities=False, overwrite=False,
-                                 num_processes_preprocessing=2, num_processes_segmentation_export=2,
-                                 folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
 
-    # predict a numpy array
-    from nnunetv2.imageio.simpleitk_reader_writer import SimpleITKIO
-    img, props = SimpleITKIO().read_images([join(nnUNet_raw, 'Dataset003_Liver/imagesTr/liver_63_0000.nii.gz')])
-    ret = predictor.predict_single_npy_array(img, props, None, None, False)
-
-    iterator = predictor.get_data_iterator_from_raw_npy_data([img], None, [props], None, 1)
-    ret = predictor.predict_from_data_iterator(iterator, False, 1)
-
-
-    # predictor = nnUNetPredictor(
-    #     tile_step_size=0.5,
-    #     use_gaussian=True,
-    #     use_mirroring=True,
-    #     perform_everything_on_device=True,
-    #     device=torch.device('cuda', 0),
-    #     verbose=False,
-    #     allow_tqdm=True
-    #     )
-    # predictor.initialize_from_trained_model_folder(
-    #     join(nnUNet_results, 'Dataset003_Liver/nnUNetTrainer__nnUNetPlans__3d_cascade_fullres'),
-    #     use_folds=(0,),
-    #     checkpoint_name='checkpoint_final.pth',
-    # )
-    # predictor.predict_from_files(join(nnUNet_raw, 'Dataset003_Liver/imagesTs'),
-    #                              join(nnUNet_raw, 'Dataset003_Liver/imagesTs_predCascade'),
-    #                              save_probabilities=False, overwrite=False,
-    #                              num_processes_preprocessing=2, num_processes_segmentation_export=2,
-    #                              folder_with_segs_from_prev_stage='/media/isensee/data/nnUNet_raw/Dataset003_Liver/imagesTs_predlowres',
-    #                              num_parts=1, part_id=0)
-
+# predictor = nnUNetPredictor(
+#     tile_step_size=0.5,
+#     use_gaussian=True,
+#     use_mirroring=True,
+#     perform_everything_on_device=True,
+#     device=torch.device('cuda', 0),
+#     verbose=False,
+#     allow_tqdm=True
+#     )
+# predictor.initialize_from_trained_model_folder(
+#     join(nnUNet_results, 'Dataset003_Liver/nnUNetTrainer__nnUNetPlans__3d_cascade_fullres'),
+#     use_folds=(0,),
+#     checkpoint_name='checkpoint_final.pth',
+# )
+# predictor.predict_from_files(join(nnUNet_raw, 'Dataset003_Liver/imagesTs'),
+#                              join(nnUNet_raw, 'Dataset003_Liver/imagesTs_predCascade'),
+#                              save_probabilities=False, overwrite=False,
+#                              num_processes_preprocessing=2, num_processes_segmentation_export=2,
+#                              folder_with_segs_from_prev_stage='/media/isensee/data/nnUNet_raw/Dataset003_Liver/imagesTs_predlowres',
+#                              num_parts=1, part_id=0)

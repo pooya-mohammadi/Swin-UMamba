@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import math
@@ -653,7 +654,7 @@ class SwinUMambaD(nn.Module):
 def load_pretrained_ckpt(
     model, 
     num_input_channels=1,
-    ckpt_path = "./data/pretrained/vmamba/vmamba_tiny_e292.pth"
+    ckpt_path:str = ""
 ):
     
     print(f"Loading weights from: {ckpt_path}")
@@ -718,8 +719,8 @@ def get_swin_umamba_d_from_plans(
     model.apply(InitWeights_He(1e-2))
     model.apply(init_last_bn_before_add_to_0)
     
-    if use_pretrain:
-        model = load_pretrained_ckpt(model, num_input_channels=num_input_channels)
+    # if use_pretrain:
+    #     model = load_pretrained_ckpt(model, num_input_channels=num_input_channels)
 
     return model
 

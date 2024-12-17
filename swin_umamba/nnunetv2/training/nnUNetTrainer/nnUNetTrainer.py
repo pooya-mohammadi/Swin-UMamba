@@ -83,7 +83,7 @@ class nnUNetTrainer(object):
         # OK OK I am guilty. But I tried.
         # https://www.osnews.com/images/comics/wtfm.jpg
         # https://i.pinimg.com/originals/26/b2/50/26b250a738ea4abc7a5af4d42ad93af0.jpg
-
+        # self.pretrain_path = pretrain_path
         self.is_ddp = dist.is_available() and dist.is_initialized()
         self.local_rank = 0 if not self.is_ddp else dist.get_rank()
 
@@ -208,6 +208,8 @@ class nnUNetTrainer(object):
                 self.configuration_manager,
                 self.num_input_channels,
                 self.enable_deep_supervision,
+                # pretrain_path=self.pretrain_path,
+
             ).to(self.device)
             # compile network for free speedup
             if self._do_i_compile():
@@ -270,7 +272,9 @@ class nnUNetTrainer(object):
                                    dataset_json,
                                    configuration_manager: ConfigurationManager,
                                    num_input_channels,
-                                   enable_deep_supervision: bool = True) -> nn.Module:
+                                   enable_deep_supervision: bool = True,
+                                   # pretrain_path:str = ''
+                                   ) -> nn.Module:
         """
         This is where you build the architecture according to the plans. There is no obligation to use
         get_network_from_plans, this is just a utility we use for the nnU-Net default architectures. You can do what
@@ -291,7 +295,9 @@ class nnUNetTrainer(object):
 
         """
         return get_network_from_plans(plans_manager, dataset_json, configuration_manager,
-                                      num_input_channels, deep_supervision=enable_deep_supervision)
+                                      num_input_channels, deep_supervision=enable_deep_supervision,
+                                      # pretrain_path= pretrain_path
+                                      )
 
     def _get_deep_supervision_scales(self):
         if self.enable_deep_supervision:
