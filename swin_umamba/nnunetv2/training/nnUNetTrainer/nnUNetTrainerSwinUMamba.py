@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 from nnunetv2.utilities.plans_handling.plans_handler import ConfigurationManager, PlansManager
-from nnunetv2.nets.SwinUMamba import get_swin_umamba_from_plans
+# from nnunetv2.nets.SwinUMamba import get_swin_umamba_from_plans
 
 
 
@@ -37,22 +37,22 @@ class nnUNetTrainerSwinUMamba(nnUNetTrainer):
     ) -> nn.Module:
 
         model = get_swin_umamba_from_plans(
-            plans_manager, 
-            dataset_json, 
+            plans_manager,
+            dataset_json,
             configuration_manager,
-            num_input_channels, 
+            num_input_channels,
             deep_supervision=enable_deep_supervision,
             use_pretrain=True,
-        )        
+        )
         summary(model, input_size=[1, num_input_channels] + configuration_manager.patch_size)
 
         return model
-    
+
     def configure_optimizers(self):
         optimizer = AdamW(
             self.network.parameters(),
-            lr=self.initial_lr, 
-            weight_decay=self.weight_decay, 
+            lr=self.initial_lr,
+            weight_decay=self.weight_decay,
             eps=1e-5,
             betas=(0.9, 0.999),
             )
@@ -62,7 +62,7 @@ class nnUNetTrainerSwinUMamba(nnUNetTrainer):
         self.print_to_log_file(f"Using scheduler {scheduler}")
 
         return optimizer, scheduler
-    
+
     def on_epoch_end(self):
         current_epoch = self.current_epoch
         if (current_epoch + 1) % self.save_every == 0:
